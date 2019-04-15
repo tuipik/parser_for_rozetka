@@ -27,10 +27,7 @@ def get_item_urls(html):
     '''збираємо всі посилання на товари'''
     soup = BeautifulSoup(html, 'lxml')
     items = soup.find('div', class_="g-i-tile-l clearfix").find_all('a', class_="responsive-img centering-child-img")
-    items_urls = []
-    for i in items:
-        item = i.get('href')
-        items_urls.append(item)
+    items_urls = [i.get('href') for i in items]
     return items_urls
 
 
@@ -49,12 +46,11 @@ def main():
             generated_url = url + '&p=' + str(i)
             all_paginated_pages.append(generated_url)
 
-
     all_items_urls = []     # Збираємо до купи всі посилання на товари
     for page in all_paginated_pages:
         all_items_urls += get_item_urls(get_html(page))
     all_items_urls = set(all_items_urls)    # прибираємо повтори
-
+    print(len(all_items_urls))
 
 
 if __name__ == '__main__':
