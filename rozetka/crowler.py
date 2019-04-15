@@ -23,6 +23,17 @@ def get_total_pages(html):
     return int(total_pages)
 
 
+def get_item_urls(html):
+    '''збираємо всі посилання на товари'''
+    soup = BeautifulSoup(html, 'lxml')
+    items = soup.find('div', class_="g-i-tile-l clearfix").find_all('a', class_="responsive-img centering-child-img")
+    items_urls = []
+    for i in items:
+        item = i.get('href')
+        items_urls.append(item)
+    return items_urls
+
+
 
 def main():
     base_url = ["https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013629",
@@ -32,11 +43,18 @@ def main():
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013468",
                 ]
 
-    all_paginated_pages = []
+    all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
     for url in base_url:
         for i in range(1, get_total_pages(get_html(url))+1):
             generated_url = url + '&p=' + str(i)
             all_paginated_pages.append(generated_url)
+
+
+    all_items_urls = []     # Збираємо до купи всі посилання на товари
+    for page in all_paginated_pages:
+        all_items_urls += get_item_urls(get_html(page))
+    all_items_urls = set(all_items_urls)    # прибираємо повтори
+
 
 
 if __name__ == '__main__':
