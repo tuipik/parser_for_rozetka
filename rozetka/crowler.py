@@ -1,5 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
+import re
+import csv
 import pprint
 
 # 1. зібрати урли розмірів
@@ -7,6 +9,7 @@ import pprint
 # 3. збираємо всі лінки на продукцію
 # 4. по кожному лінку проходимо і збираємо ТМ, назву, розмір, матеріал, склад, ціна, наявність
 # 5. записуємо в файл
+# 6. багатопоточність
 
 def get_html(url):
     '''отримуємо весь базовий html'''
@@ -35,20 +38,76 @@ def get_item_urls(html):
 def get_item_info(html):
     '''збираємо інформацію про товар'''
     soup = BeautifulSoup(html,'lxml')
-    brand = soup.find('div', class_="detail-breadcrums-wrap").\
-        find_all('li', class_="breadcrumbs-i ng-star-inserted")[-1].\
-        find('span', class_="breadcrumbs-title ng-star-inserted").text.split(' ')[2:]
-    item_brand = ' '.join(brand)
 
-    item_name = soup.find('div', class_="detail-title-code pos-fix clearfix").\
-        find('h1', class_="ng-star-inserted").text
-
-    item_price = int(soup.find('div', class_="detail-price-lable clearfix").\
-        find('div', class_="detail-buy-label ng-star-inserted").text.split()[0])
-
-    return item_brand, item_name, item_price
+    try:
+        brand = soup.find('div', class_="detail-breadcrums-wrap").\
+            find_all('li', class_="breadcrumbs-i ng-star-inserted")[-1].\
+            find('span', class_="breadcrumbs-title ng-star-inserted").\
+                    text.split(' ')[2:]
+        item_brand = ' '.join(brand)
+    except AttributeError:
+        item_brand = 'Виробника не знайдено'
 
 
+    try:
+        item_name = soup.find('div', class_="detail-title-code pos-fix clearfix").\
+            find('h1', class_="ng-star-inserted").text
+    except AttributeError:
+        item_name = 'Назву не знайдено'
+
+
+    try:
+        item_price = int(
+            soup.find('div', class_="detail-price-lable clearfix").\
+                find('div', class_="detail-buy-label ng-star-inserted").\
+                text.split()[0])
+    except AttributeError:
+        try:
+            item_price = int(
+                soup.find('div', class_="detail-main-wrap clearfix").find(
+                    'div', class_="detail-price-uah").text.split()[0])
+        except AttributeError:
+            item_price = 0
+
+
+    try:
+        availability = soup.find('div', class_="price_cart").\
+            find('div', class_='detail-status').text.strip()
+    except AttributeError:
+        availability = 'Є в наявності'
+
+    item_info = {'Виробник': item_brand,
+                'Назва': item_name,
+                'Ціна': item_price,
+                'Наявність': availability,
+                }
+
+    # iterating tables with item data
+    for tab in soup.find_all('table',
+                             attrs={'class': ['feature-t ng-star-inserted']}):
+        for row in tab.find_all('tr'):
+            tmp = row.find_all('td')
+            if len(tmp) == 2:
+                item_info[re.sub(r'\s{3,}', '', tmp[0].text.strip())] = \
+                    re.sub(r'\s{3,}', '', tmp[1].text.strip())
+
+
+    return item_info
+
+
+def write_csv(data):
+    with open('kolgotki.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(('Виробник', 'Назва', 'Зріст', 'Ціна', 'Наявність', 'Матеріал', 'Склад', 'Сезон'))
+        for row in data:
+            writer.writerow((row['Виробник'],
+                             row['Назва'],
+                             row['Зріст'],
+                             row['Ціна'],
+                             row['Наявність'],
+                             row['Матеріал'],
+                             row['Склад'],
+                             row['Сезон']))
 
 
 def main():
@@ -59,22 +118,28 @@ def main():
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013468",
                 ]
 
-    all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
-    for url in base_url:
-        for i in range(1, get_total_pages(get_html(url))+1):
-            generated_url = url + '&p=' + str(i)
-            all_paginated_pages.append(generated_url)
-
-    all_items_urls = []     # Збираємо до купи всі посилання на товари
-    for page in all_paginated_pages:
-        all_items_urls += get_item_urls(get_html(page))
-    all_items_urls = set(all_items_urls)    # прибираємо повтори
-    print(len(all_items_urls))
-
-
+    # all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
+    # for url in base_url:
+    #     for i in range(1, get_total_pages(get_html(url))+1):
+    #         generated_url = url + '&p=' + str(i)
+    #         all_paginated_pages.append(generated_url)
+    #
+    # all_items_urls = []     # Збираємо до купи всі посилання на товари
+    # for page in all_paginated_pages:
+    #     all_items_urls += get_item_urls(get_html(page))
+    # all_items_urls = set(all_items_urls)    # прибираємо повтори
+    # print(len(all_items_urls))
+    all_items_urls = ['https://rozetka.com.ua/ua/legka_hoda_4823028072820/p22136472/',
+                      'https://rozetka.com.ua/ua/giulia_4820040937342/p47649128/',
+                      'https://rozetka.com.ua/ua/zeki_corap_roz62050119589/p37261912/',
+                      'https://rozetka.com.ua/ua/legka_hoda_4823028081020/p35883153/']
+    all_items_info = []
     for url in all_items_urls:
-        print(get_item_info(url))
+        all_items_info.append(get_item_info(get_html(url)))
 
+    pprint.pprint(all_items_info)
+
+    write_csv(all_items_info)
 
 
 if __name__ == '__main__':
