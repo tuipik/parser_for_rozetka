@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import csv
+from datetime import datetime
+from multiprocessing import Pool
 import pprint
 
 # 1. зібрати урли розмірів
@@ -98,19 +100,29 @@ def get_item_info(html):
 def write_csv(data):
     with open('kolgotki.csv', 'w') as f:
         writer = csv.writer(f)
-        writer.writerow(('Виробник', 'Назва', 'Зріст', 'Ціна', 'Наявність', 'Матеріал', 'Склад', 'Сезон'))
-        for row in data:
-            writer.writerow((row['Виробник'],
-                             row['Назва'],
-                             row['Зріст'],
-                             row['Ціна'],
-                             row['Наявність'],
-                             row['Матеріал'],
-                             row['Склад'],
-                             row['Сезон']))
+        writer.writerow(('Виробник', 'Назва', 'Зріст', 'Ціна', 'Наявність',
+                         'Матеріал', 'Склад', 'Сезон'))
+        try:
+            for row in data:
+                writer.writerow((row['Виробник'],
+                                 row['Назва'],
+                                 row['Зріст'],
+                                 row['Ціна'],
+                                 row['Наявність'],
+                                 row['Склад']))
+        except KeyError:
+            pass
 
+
+def make_all(url):
+    # item_url = get_item_urls(get_html(url))
+    # print(item_url)
+
+    a = get_item_info(get_html(url))
+    return a
 
 def main():
+    start = datetime.now()
     base_url = ["https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013629",
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013601",
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013279",
@@ -118,29 +130,44 @@ def main():
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013468",
                 ]
 
-    # all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
-    # for url in base_url:
-    #     for i in range(1, get_total_pages(get_html(url))+1):
-    #         generated_url = url + '&p=' + str(i)
-    #         all_paginated_pages.append(generated_url)
-    #
-    # all_items_urls = []     # Збираємо до купи всі посилання на товари
-    # for page in all_paginated_pages:
-    #     all_items_urls += get_item_urls(get_html(page))
-    # all_items_urls = set(all_items_urls)    # прибираємо повтори
-    # print(len(all_items_urls))
-    all_items_urls = ['https://rozetka.com.ua/ua/legka_hoda_4823028072820/p22136472/',
-                      'https://rozetka.com.ua/ua/giulia_4820040937342/p47649128/',
-                      'https://rozetka.com.ua/ua/zeki_corap_roz62050119589/p37261912/',
-                      'https://rozetka.com.ua/ua/legka_hoda_4823028081020/p35883153/']
-    all_items_info = []
-    for url in all_items_urls:
-        all_items_info.append(get_item_info(get_html(url)))
+    all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
+    for url in base_url:
+        for i in range(1, get_total_pages(get_html(url))+1):
+            generated_url = url + '&p=' + str(i)
+            all_paginated_pages.append(generated_url)
 
-    pprint.pprint(all_items_info)
 
-    write_csv(all_items_info)
+    all_items_urls = []     # Збираємо до купи всі посилання на товари
+    for page in all_paginated_pages:
+        all_items_urls += get_item_urls(get_html(page))
+    all_items_urls = set(all_items_urls)    # прибираємо повтори
+    print(len(all_items_urls))
+    # all_items_urls = ['https://rozetka.com.ua/ua/legka_hoda_4823028072820/p22136472/',
+    #                   'https://rozetka.com.ua/ua/giulia_4820040937342/p47649128/',
+    #                   'https://rozetka.com.ua/ua/zeki_corap_roz62050119589/p37261912/',
+    #                   'https://rozetka.com.ua/ua/legka_hoda_4823028081020/p35883153/']
+    # all_items_info = []
+    # for url in all_items_urls:
+    #     all_items_info.append(get_item_info(get_html(url)))
 
+
+    with Pool(40) as p:
+        asd = p.map(make_all, all_items_urls)
+        print(len(asd))
+        pprint.pprint(asd)
+
+        # print(a)
+        # all_items_info.append(a)
+
+    # pprint.pprint(all_items_info)
+    print(len(asd))
+    write_csv(asd)
+
+    end = datetime.now()
+    print(end - start)
 
 if __name__ == '__main__':
     main()
+
+
+# 0:00:00.761059
