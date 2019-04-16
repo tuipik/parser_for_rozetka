@@ -26,9 +26,28 @@ def get_total_pages(html):
 def get_item_urls(html):
     '''збираємо всі посилання на товари'''
     soup = BeautifulSoup(html, 'lxml')
-    items = soup.find('div', class_="g-i-tile-l clearfix").find_all('a', class_="responsive-img centering-child-img")
+    items = soup.find('div', class_="g-i-tile-l clearfix").\
+        find_all('a', class_="responsive-img centering-child-img")
     items_urls = [i.get('href') for i in items]
     return items_urls
+
+
+def get_item_info(html):
+    '''збираємо інформацію про товар'''
+    soup = BeautifulSoup(html,'lxml')
+    brand = soup.find('div', class_="detail-breadcrums-wrap").\
+        find_all('li', class_="breadcrumbs-i ng-star-inserted")[-1].\
+        find('span', class_="breadcrumbs-title ng-star-inserted").text.split(' ')[2:]
+    item_brand = ' '.join(brand)
+
+    item_name = soup.find('div', class_="detail-title-code pos-fix clearfix").\
+        find('h1', class_="ng-star-inserted").text
+
+    item_price = int(soup.find('div', class_="detail-price-lable clearfix").\
+        find('div', class_="detail-buy-label ng-star-inserted").text.split()[0])
+
+    return item_brand, item_name, item_price
+
 
 
 
@@ -51,6 +70,11 @@ def main():
         all_items_urls += get_item_urls(get_html(page))
     all_items_urls = set(all_items_urls)    # прибираємо повтори
     print(len(all_items_urls))
+
+
+    for url in all_items_urls:
+        print(get_item_info(url))
+
 
 
 if __name__ == '__main__':
