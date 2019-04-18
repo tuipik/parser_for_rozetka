@@ -1,17 +1,10 @@
 import requests
-from bs4 import BeautifulSoup
 import re
 import csv
+from bs4 import BeautifulSoup
 from datetime import datetime
 from multiprocessing import Pool
-import pprint
 
-# 1. зібрати урли розмірів
-# 2. по кожному розміру пройтися по пагінації, зібрати кількість сторінок
-# 3. збираємо всі лінки на продукцію
-# 4. по кожному лінку проходимо і збираємо ТМ, назву, розмір, матеріал, склад, ціна, наявність
-# 5. записуємо в файл
-# 6. багатопоточність
 
 def get_html(url):
     '''отримуємо весь базовий html'''
@@ -78,13 +71,26 @@ def get_item_info(html):
     except AttributeError:
         availability = 'Є в наявності'
 
+
+    try:
+        link = 'https://rozetka.com.ua' + soup.find('div', class_="nav-tabs-desktop").\
+            find('a', class_="nav-tabs-link novisited ng-star-inserted active").\
+            get('href')
+    except AttributeError:
+        availability = 'http'
+
+
     item_info = {'Виробник': item_brand,
                 'Назва': item_name,
                 'Ціна': item_price,
                 'Наявність': availability,
+                'Матеріал': '',
+                'Склад': '',
+                'Сезон': '',
+                'Посилання': link,
                 }
 
-    # iterating tables with item data
+    # Дістаємо інфо з таблиці
     for tab in soup.find_all('table',
                              attrs={'class': ['feature-t ng-star-inserted']}):
         for row in tab.find_all('tr'):
@@ -97,11 +103,16 @@ def get_item_info(html):
     return item_info
 
 
+def collect_all_information(url):
+    all_information = get_item_info(get_html(url))
+    return all_information
+
+
 def write_csv(data):
-    with open('kolgotki.csv', 'w') as f:
+    with open('kolgotki_{}.csv'.format(datetime.now()), 'w') as f:
         writer = csv.writer(f)
         writer.writerow(('Виробник', 'Назва', 'Зріст', 'Ціна', 'Наявність',
-                         'Матеріал', 'Склад', 'Сезон'))
+                         'Матеріал', 'Склад', 'Сезон','Посилання'))
         try:
             for row in data:
                 writer.writerow((row['Виробник'],
@@ -109,17 +120,14 @@ def write_csv(data):
                                  row['Зріст'],
                                  row['Ціна'],
                                  row['Наявність'],
-                                 row['Склад']))
+                                 row['Склад'],
+                                 row['Матеріал'],
+                                 row['Сезон'],
+                                 row['Посилання'],
+                                 ))
         except KeyError:
             pass
 
-
-def make_all(url):
-    # item_url = get_item_urls(get_html(url))
-    # print(item_url)
-
-    a = get_item_info(get_html(url))
-    return a
 
 def main():
     start = datetime.now()
@@ -129,45 +137,30 @@ def main():
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013426",
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013468",
                 ]
+    print('Починаю шукати по {} запитах'.format(len(base_url)))
 
     all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
     for url in base_url:
         for i in range(1, get_total_pages(get_html(url))+1):
             generated_url = url + '&p=' + str(i)
             all_paginated_pages.append(generated_url)
+    print('Знайдено {} сторінок з пошуковими запитами'.format(len(all_paginated_pages)))
 
 
     all_items_urls = []     # Збираємо до купи всі посилання на товари
     for page in all_paginated_pages:
         all_items_urls += get_item_urls(get_html(page))
-    all_items_urls = set(all_items_urls)    # прибираємо повтори
-    print(len(all_items_urls))
-    # all_items_urls = ['https://rozetka.com.ua/ua/legka_hoda_4823028072820/p22136472/',
-    #                   'https://rozetka.com.ua/ua/giulia_4820040937342/p47649128/',
-    #                   'https://rozetka.com.ua/ua/zeki_corap_roz62050119589/p37261912/',
-    #                   'https://rozetka.com.ua/ua/legka_hoda_4823028081020/p35883153/']
-    # all_items_info = []
-    # for url in all_items_urls:
-    #     all_items_info.append(get_item_info(get_html(url)))
+    print('Кількість пошукових запитів - {}'.format(len(all_items_urls)))
 
 
-    with Pool(40) as p:
-        asd = p.map(make_all, all_items_urls)
-        print(len(asd))
-        pprint.pprint(asd)
+    with Pool(50) as p: # Збираємо всю інформацію, яка нас цікавить
+        asd = p.map(collect_all_information, all_items_urls)
 
-        # print(a)
-        # all_items_info.append(a)
-
-    # pprint.pprint(all_items_info)
-    print(len(asd))
     write_csv(asd)
 
     end = datetime.now()
-    print(end - start)
+    print('Завершено за {}'.format(end - start))
+
 
 if __name__ == '__main__':
     main()
-
-
-# 0:00:00.761059
