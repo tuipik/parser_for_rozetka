@@ -84,6 +84,8 @@ def get_item_info(html):
                 'Назва': item_name,
                 'Ціна': item_price,
                 'Наявність': availability,
+                'Зріст': '',
+                'Розмір': '',
                 'Матеріал': '',
                 'Склад': '',
                 'Сезон': '',
@@ -111,13 +113,14 @@ def collect_all_information(url):
 def write_csv(data):
     with open('kolgotki_{}.csv'.format(datetime.now()), 'w') as f:
         writer = csv.writer(f)
-        writer.writerow(('Виробник', 'Назва', 'Зріст', 'Ціна', 'Наявність',
+        writer.writerow(('Виробник', 'Назва', 'Зріст','Розмір', 'Ціна', 'Наявність',
                          'Матеріал', 'Склад', 'Сезон','Посилання'))
         try:
             for row in data:
                 writer.writerow((row['Виробник'],
                                  row['Назва'],
                                  row['Зріст'],
+                                 row['Розмір'],
                                  row['Ціна'],
                                  row['Наявність'],
                                  row['Склад'],
@@ -137,6 +140,7 @@ def main():
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013426",
                 "https://rozetka.com.ua/ua/search/?class=0&text=%D0%BA%D0%BE%D0%BB%D0%B3%D0%BE%D1%82%D0%BA%D0%B8&section_id=4654655&option_val=1013468",
                 ]
+
     print('Починаю шукати по {} запитах'.format(len(base_url)))
 
     all_paginated_pages = []    # Збираємо до купи всі сторінки з пагінації
@@ -151,7 +155,6 @@ def main():
     for page in all_paginated_pages:
         all_items_urls += get_item_urls(get_html(page))
     print('Кількість пошукових запитів - {}'.format(len(all_items_urls)))
-
 
     with Pool(50) as p: # Збираємо всю інформацію, яка нас цікавить
         asd = p.map(collect_all_information, all_items_urls)
